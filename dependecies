@@ -94,7 +94,6 @@ sudo xbps-install -Sy \
     python3-gobject\
     gnome-bluetooth \
     glib-devel \
-    cargo \
     base-devel
 success "Exo dependencies installed."
 
@@ -123,10 +122,9 @@ success "Ignis-gvc installed."
 # ================================
 #  Install Matugen
 # ================================
-info "Installing Matugen using Cargo..."
-cargo install matugen
-success "Matugen installed."
-
+curl -LO https://sourceforge.net/projects/d77void/files/d77void-repo/matugen-3.1.0_1.x86_64.xbps
+sudo xbps-rindex -a matugen-3.1.0_1.x86_64.xbps
+sudo xbps-install --repository=. matugen
 # ================================
 #  Install Dart-Sass
 # ================================
