@@ -1,0 +1,196 @@
+#!/bin/sh
+set -e
+
+# ================================
+#  Warna untuk tampilan
+# ================================
+GREEN="\033[0;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[0;34m"
+RED="\033[0;31m"
+NC="\033[0m" # No Color
+
+info() { echo -e "${BLUE}>> $1${NC}"; }
+success() { echo -e "${GREEN}✔ $1${NC}"; }
+warn() { echo -e "${YELLOW}! $1${NC}"; }
+error() { echo -e "${RED}✖ $1${NC}"; }
+
+# ================================
+#  Fungsi git clone dengan retry
+# ================================
+git_clone_retry() {
+    REPO_URL="$1"
+    TARGET_DIR="$2"
+    MAX_RETRIES=5
+    RETRY_DELAY=3
+    COUNT=0
+
+    while [ $COUNT -lt $MAX_RETRIES ]; do
+        if git clone "$REPO_URL" "$TARGET_DIR"; then
+            success "Cloned $REPO_URL successfully."
+            return 0
+        else
+            COUNT=$((COUNT+1))
+            warn "Failed to clone $REPO_URL. Retry $COUNT/$MAX_RETRIES in $RETRY_DELAY seconds..."
+	    rm -rf $TARGET_DIR
+            sleep $RETRY_DELAY
+        fi
+    done
+
+    error "Failed to clone $REPO_URL after $MAX_RETRIES attempts."
+    exit 1
+}
+
+# ================================
+#  Setup repository
+# ================================
+info "Setting up TUNA repository..."
+echo "repository=https://mirrors.tuna.tsinghua.edu.cn/voidlinux/current" | sudo tee /etc/xbps.d/00-repository-main.conf > /dev/null
+success "Repository set!"
+
+sleep 1
+info "Updating package database..."
+sudo xbps-install -Syy
+success "Package database updated."
+
+# ================================
+#  Install main packages
+# ================================
+info "Installing main packages..."
+sudo xbps-install -Sy \
+    elogind \
+    fuzzel \
+    NetworkManager\
+    chromium \
+    tmux \
+    fzf \
+    wl-clipboard \
+    curl \
+    wget \
+    zsh \
+    niri \
+    starship \
+    alacritty \
+    rsync \
+    mesa-dri \
+    dejavu-fonts-ttf
+success "Main packages installed."
+
+# ================================
+#  Install Exo dependencies
+# ================================
+info "Installing Exo dependencies..."
+sudo xbps-install -Sy \
+    meson \
+    cmake \
+    swww \
+    gtk4-layer-shell\
+    gtk4-layer-shell-devel\
+    gsettings-desktop-schemas\
+    gobject-introspection \
+    pulseaudio-devel \
+    python3-pip \
+    python3-cairo\
+    python3-gobject\
+    gnome-bluetooth \
+    glib-devel \
+    cargo \
+    base-devel
+success "Exo dependencies installed."
+
+# ================================
+#  Install Ignis-dev
+# ================================
+info "Installing Ignis-dev..."
+git_clone_retry "https://github.com/ignis-sh/ignis.git" "ignis"
+cd ignis
+pip install --user -e . --break-system-packages
+cd ..
+success "Ignis-dev installed."
+
+# ================================
+#  Install Ignis-gvc
+# ================================
+info "Installing Ignis-gvc..."
+git_clone_retry "https://github.com/ignis-sh/ignis-gvc" "ignis-gvc"
+cd ignis-gvc
+meson setup build --prefix=/usr
+meson compile -C build
+sudo meson install -C build
+cd ..
+success "Ignis-gvc installed."
+
+# ================================
+#  Install Matugen
+# ================================
+info "Installing Matugen using Cargo..."
+cargo install matugen
+success "Matugen installed."
+
+# ================================
+#  Install Dart-Sass
+# ================================
+info "Installing Dart-Sass..."
+mkdir -p ~/.local/bin
+curl -LO https://github.com/sass/dart-sass/releases/download/1.97.3/dart-sass-1.97.3-linux-x64.tar.gz
+tar xvf dart-sass-1.97.3-linux-x64.tar.gz
+cp -r dart-sass/* ~/.local/bin
+success "Dart-Sass installed."
+echo "PATH=~/.local/bin:$PATH" > ~/.zshrc
+echo "PATH=~/.local/bin:$PATH" > ~/.bashrc
+
+# ================================
+#  Install Material Icons
+# ================================
+info "Installing Material 3 fonts..."
+BASE_URL="https://raw.githubusercontent.com/google/material-design-icons/master"
+FONT_DIR="$HOME/.local/share/fonts/material"
+VAR_DIR="$HOME/.local/share/fonts/material-symbols"
+
+mkdir -p "$FONT_DIR" "$VAR_DIR"
+
+# Regular fonts
+wget -q --show-progress -P "$FONT_DIR" \
+  "$BASE_URL/font/MaterialIcons-Regular.ttf" \
+  "$BASE_URL/font/MaterialIconsOutlined-Regular.otf" \
+  "$BASE_URL/font/MaterialIconsRound-Regular.otf" \
+  "$BASE_URL/font/MaterialIconsSharp-Regular.otf" \
+  "$BASE_URL/font/MaterialIconsTwoTone-Regular.otf"
+
+# Variable fonts (URL-encode square brackets)
+wget -q --show-progress -P "$VAR_DIR" \
+  "$BASE_URL/variablefont/MaterialSymbolsOutlined%5BFILL,GRAD,opsz,wght%5D.ttf" \
+  "$BASE_URL/variablefont/MaterialSymbolsOutlined%5BFILL,GRAD,opsz,wght%5D.woff2" \
+  "$BASE_URL/variablefont/MaterialSymbolsRounded%5BFILL,GRAD,opsz,wght%5D.ttf" \
+  "$BASE_URL/variablefont/MaterialSymbolsRounded%5BFILL,GRAD,opsz,wght%5D.woff2" \
+  "$BASE_URL/variablefont/MaterialSymbolsSharp%5BFILL,GRAD,opsz,wght%5D.ttf" \
+  "$BASE_URL/variablefont/MaterialSymbolsSharp%5BFILL,GRAD,opsz,wght%5D.woff2"
+
+fc-cache -fv
+success "Material 3 fonts installed."
+
+
+# ================================
+#  Enable services
+# ================================
+info "Enabling services..."
+mkdir -p /var/service
+
+enable_service() {
+  svc="$1"
+  if [ -L "/var/service/$svc" ]; then
+    warn "Service $svc already enabled"
+  else
+    ln -s "/etc/sv/$svc" "/var/service/$svc"
+    success "Service $svc enabled"
+  fi
+}
+
+# Uncomment services yang ingin diaktifkan
+ enable_service NetworkManager
+# enable_service dbus
+# enable_service alsa
+enable_service elogind
+
+success "All tasks completed!"
+
