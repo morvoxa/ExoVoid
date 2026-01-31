@@ -97,6 +97,8 @@ sudo xbps-install -Sy \
     base-devel
 success "Exo dependencies installed."
 
+info "Cloning Exo"
+git_clone_retry "https://github.com/debuggyo/Exo" "~/.cache/Exo"
 # ================================
 #  Install Ignis-dev
 # ================================

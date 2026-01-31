@@ -24,7 +24,7 @@ class ExoInstaller:
 
     def __init__(self):
         self.config_dir = os.path.expanduser("~/.config/")
-        self.source_dir = os.path.expanduser("~/ExoVoid/Exo/")
+        self.source_dir = os.path.expanduser("~/.cache/Exo/")
         self.dry_run = False
 
     # ======================
